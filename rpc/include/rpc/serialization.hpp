@@ -116,7 +116,7 @@ namespace rpc {
 
 
 	template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>> void deserialize_to(const std::byte*& ptr, const std::byte* end, T& to) {
-		if(end - ptr < sizeof(T)) {
+		if(static_cast<size_t>(end - ptr) < sizeof(T)) {
 			throw std::invalid_argument("Invalid serialized value (integral type)");
 		}
 		std::byte* num_begin = reinterpret_cast<std::byte*>(&to);
@@ -191,7 +191,7 @@ namespace rpc {
 	inline void deserialize_to(const std::byte*& ptr, const std::byte* end, std::string& to) {
 		uint64_t size;
 		deserialize_to(ptr, end, size);
-		if(size > end - ptr) {
+		if(size > static_cast<size_t>(end - ptr)) {
 			throw std::invalid_argument("Invalid serialized value (std::string)");
 		}
 		to.resize(size);
