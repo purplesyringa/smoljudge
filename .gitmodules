@@ -1,0 +1,9 @@
+[submodule "vendor/uvw"]
+	path = vendor/uvw
+	url = https://github.com/skypjack/uvw.git
+[submodule "vendor/libuv"]
+	path = vendor/libuv
+	url = https://github.com/libuv/libuv.git
+[submodule "vendor/span"]
+	path = vendor/span
+	url = https://github.com/tcbrindle/span.git
