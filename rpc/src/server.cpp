@@ -3,7 +3,6 @@
 
 #include <uvw.hpp>
 
-#include "async.hpp"
 #include "common.hpp"
 #include "server.hpp"
 
@@ -99,7 +98,7 @@ namespace rpc {
 				std::cerr << "Error on #" << client_id << ": response to message #" << message.message_id << ": no corresponding request or double response" << std::endl;
 				return;
 			}
-			promises.extract(it).mapped().set(message.args);
+			promises.extract(it).mapped().set(std::move(message.args));
 		} else if(message.method_id == -2) {
 			std::cerr << "Error on #" << client_id << ": message #" << message.message_id << ": " << deserialize<std::string>(message.args) << std::endl;
 		} else if(0 <= message.method_id && message.method_id < server.server_impl.methods.size()) {
@@ -112,10 +111,10 @@ namespace rpc {
 	}
 
 
-	promise<std::vector<std::byte>> generic_server::server_client::invoke(const char* method_name, std::vector<std::byte>&& args) {
+	async::promise<std::vector<std::byte>> generic_server::server_client::invoke(const char* method_name, std::vector<std::byte>&& args) {
 		uint64_t message_id = next_message_id++;
 		sock->invoke(client_ids_of_methods.at(method_name), message_id, std::move(args));
-		promise<std::vector<std::byte>> prom;
+		async::promise<std::vector<std::byte>> prom;
 		promises.emplace(message_id, prom);
 		return prom;
 	}
@@ -125,7 +124,7 @@ namespace rpc {
 	generic_server::client_invoker::client_invoker(server_client& client): client(client) {
 	}
 
-	promise<std::vector<std::byte>> generic_server::client_invoker::invoke(const char* method_name, std::vector<std::byte>&& args) {
+	async::promise<std::vector<std::byte>> generic_server::client_invoker::invoke(const char* method_name, std::vector<std::byte>&& args) {
 		return client.invoke(method_name, std::move(args));
 	}
 
@@ -151,6 +150,9 @@ namespace rpc {
 			close();
 		}
 		server_stop_methods.clear();
+		for(auto& client: clients) {
+			client.stop();
+		}
 	}
 
 

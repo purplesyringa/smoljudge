@@ -9,7 +9,7 @@ librpc.a: $(CXX_OBJS)
 	$(AR) crf $@ $^
 
 $(CXX_OBJS): build/%.o: src/%.cpp
-	$(CXX) $< -o $@ -g -O2 -Wall -std=c++2a -MMD -c -DUVW_AS_LIB -I../vendor/libuv/include -I../vendor/uvw/src -I../vendor/span/include -Iinclude/rpc
+	$(CXX) $< -o $@ -g -O2 -Wall -std=c++2a -MMD -c -DUVW_AS_LIB -I../vendor/libuv/include -I../vendor/uvw/src -I../vendor/span/include -I../common/include -Iinclude/rpc
 
 -include $(CXX_DEPS)
 
@@ -18,7 +18,7 @@ $(CXX_OBJS): build/%.o: src/%.cpp
 	$(MAKE) -C ../uvw
 
 build/test.o: test.cpp
-	$(CXX) $< -o $@ -g -O2 -Wall -std=c++2a -MMD -c -DUVW_AS_LIB -I../vendor/libuv/include -I../vendor/uvw/src -I../vendor/span/include -Iinclude/rpc
+	$(CXX) $< -o $@ -g -O2 -Wall -std=c++2a -MMD -c -DUVW_AS_LIB -I../vendor/libuv/include -I../vendor/uvw/src -I../vendor/span/include -I../common/include -Iinclude/rpc
 test: build/test.o librpc.a ../uvw/build/libuvw.a ../uvw/build/libuv.a
 	$(CXX) $^ -o $@ -pthread -ldl
 

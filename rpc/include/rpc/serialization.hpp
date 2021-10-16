@@ -65,6 +65,7 @@ namespace rpc {
 	template<typename... Types> void serialize_to(const std::tuple<Types...>& data, std::vector<std::byte>& to);
 	template<typename First, typename Second> void serialize_to(const std::pair<First, Second>& data, std::vector<std::byte>& to);
 	template<typename T, size_t N> void serialize_to(const std::array<T, N>& data, std::vector<std::byte>& to);
+	template<typename T> void serialize_to(const std::optional<T>& data, std::vector<std::byte>& to);
 	void serialize_to(const std::string& data, std::vector<std::byte>& to);
 
 	template<typename T> void serialize_to(const std::vector<T>& data, std::vector<std::byte>& to) {
@@ -97,6 +98,15 @@ namespace rpc {
 	template<typename T, size_t N> void serialize_to(const std::array<T, N>& data, std::vector<std::byte>& to) {
 		for(const auto& elem: data) {
 			serialize_to(elem, to);
+		}
+	}
+
+	template<typename T> void serialize_to(const std::optional<T>& data, std::vector<std::byte>& to) {
+		if(data) {
+			serialize_to(true, to);
+			serialize_to(*data, to);
+		} else {
+			serialize_to(false, to);
 		}
 	}
 
@@ -140,6 +150,7 @@ namespace rpc {
 	template<typename... Types> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::tuple<Types...>& to);
 	template<typename First, typename Second> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::pair<First, Second>& to);
 	template<typename T, size_t N> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::array<T, N>& to);
+	template<typename T> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::optional<T>& to);
 	void deserialize_to(const std::byte*& ptr, const std::byte* end, std::string& to);
 
 	template<typename T> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::vector<T>& to) {
@@ -185,6 +196,16 @@ namespace rpc {
 	template<typename T, size_t N> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::array<T, N>& to) {
 		for(size_t i = 0; i < N; i++) {
 			deserialize_to(ptr, end, to[i]);
+		}
+	}
+
+	template<typename T> void deserialize_to(const std::byte*& ptr, const std::byte* end, std::optional<T>& to) {
+		bool has;
+		deserialize_to(ptr, end, has);
+		if(has) {
+			deserialize_to(ptr, end, to.emplace());
+		} else {
+			to.reset();
 		}
 	}
 
@@ -252,6 +273,9 @@ namespace rpc {
 	template<> struct type_string<std::string> {
 		static inline std::string text = "string";
 	};
+	template<typename T> struct type_string<std::vector<T>> {
+		static inline std::string text = "vector<" + type_string<T>::text + ">";
+	};
 	template<typename... Types> struct type_string<std::variant<Types...>> {
 		static inline std::string text = "variant<" + join_strings(", ", {type_string<Types>::text...}) + ">";
 	};
@@ -263,6 +287,9 @@ namespace rpc {
 	};
 	template<typename T, size_t N> struct type_string<std::array<T, N>> {
 		static inline std::string text = "array<" + type_string<T>::text + ", " + std::to_string(N) + ">";
+	};
+	template<typename T> struct type_string<std::optional<T>> {
+		static inline std::string text = "optional<" + type_string<T>::text + ">";
 	};
 	template<typename R, typename... Args> struct type_string<R(Args...)> {
 		static inline std::string text = type_string<R>::text + "(" + join_strings(", ", {type_string<Args>::text...}) + + ")";

@@ -32,7 +32,7 @@ public:
 
 class reverse_echo_impl: public rpc::duplex_impl<reverse_echo_impl, reverse_echo_protocol, echo_protocol> {
 public:
-	rpc::promise<std::string> say_good_bye(std::string name) {
+	async::promise<std::string> say_good_bye(std::string name) {
 		return peer.echo_v1(name) | [](std::string text) {
 			return "Good bye, " + text + "!";
 		};

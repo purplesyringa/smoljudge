@@ -10,7 +10,8 @@
 
 #include <tcb/span.hpp>
 
-#include "async.hpp"
+#include "common/async.hpp"
+
 #include "common.hpp"
 #include "reflection.hpp"
 #include "socket.hpp"
@@ -24,7 +25,7 @@ namespace rpc {
 			void* server_impl_object;
 
 			std::map<std::string, int32_t> client_ids_of_methods;
-			std::map<size_t, promise<std::vector<std::byte>>> promises;
+			std::map<size_t, async::promise<std::vector<std::byte>>> promises;
 			uint64_t next_message_id = 0;
 
 			std::shared_ptr<generic_socket> sock;
@@ -37,7 +38,7 @@ namespace rpc {
 			void on_message(rpc_message&& message);
 			void on_incoming_handshake(tcb::span<const std::byte> span);
 
-			promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args);
+			async::promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args);
 
 			void report_handshake_error(const std::string& text);
 			void handle_message(const rpc_message& message);
@@ -51,7 +52,7 @@ namespace rpc {
 
 		public:
 			client_invoker(server_client& client);
-			virtual promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args);
+			virtual async::promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args);
 		};
 
 
@@ -80,7 +81,7 @@ namespace rpc {
 	};
 
 
-	template<typename ServerImpl, typename ClientProtocol> class server: public generic_server {
+	template<typename ServerImpl, typename ClientProtocol = EmptyProtocol> class server: public generic_server {
 		static void* _server_impl_factory(std::unique_ptr<generic_peer_invoker>&& invoker) {
 			return new ServerImpl{std::move(invoker)};
 		}

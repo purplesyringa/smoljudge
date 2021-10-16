@@ -93,7 +93,7 @@ namespace rpc {
 				std::cerr << "Client failure on " << server_text_address << ": Response to message #" << message.message_id << ": no corresponding request or double response" << std::endl;
 				return;
 			}
-			promises.extract(it).mapped().set(message.args);
+			promises.extract(it).mapped().set(std::move(message.args));
 		} else if(message.method_id == -2) {
 			std::cerr << "Client failure on " << server_text_address << ": Message #" << message.message_id << ": " << deserialize<std::string>(message.args) << std::endl;
 		} else if(0 <= message.method_id && message.method_id < client_impl.methods.size()) {
@@ -161,14 +161,14 @@ namespace rpc {
 	}
 
 
-	promise<std::vector<std::byte>> generic_client::invoke(const char* method_name, std::vector<std::byte>&& args) {
+	async::promise<std::vector<std::byte>> generic_client::invoke(const char* method_name, std::vector<std::byte>&& args) {
 		uint64_t message_id = next_message_id++;
 		if(!sock || !sock->handshake_finished()) {
 			pending_messages.push_back({method_name, message_id, std::move(args)});
 		} else {
 			sock->invoke(server_ids_of_methods.at(method_name), message_id, std::move(args));
 		}
-		promise<std::vector<std::byte>> prom;
+		async::promise<std::vector<std::byte>> prom;
 		promises.emplace(message_id, prom);
 		return prom;
 	}

@@ -9,7 +9,8 @@
 
 #include <tcb/span.hpp>
 
-#include "async.hpp"
+#include "common/async.hpp"
+
 #include "common.hpp"
 #include "reflection.hpp"
 #include "socket.hpp"
@@ -41,7 +42,7 @@ namespace rpc {
 
 		generic_protocol server_protocol;
 		std::map<std::string, int32_t> server_ids_of_methods;
-		std::map<size_t, promise<std::vector<std::byte>>> promises;
+		std::map<size_t, async::promise<std::vector<std::byte>>> promises;
 		uint64_t next_message_id = 0;
 
 		generic_impl client_impl;
@@ -57,7 +58,7 @@ namespace rpc {
 		struct proxy_invoker {
 			generic_client* client;
 
-			template<typename ReturnType, typename... Args> promise<ReturnType> invoke(const char* method_name, Args&&... args) {
+			template<typename ReturnType, typename... Args> async::promise<ReturnType> invoke(const char* method_name, Args&&... args) {
 				return client->invoke(method_name, serialize(std::tuple<Args...>{std::forward<Args>(args)...})) | [](const std::vector<std::byte>& data) {
 					return deserialize<ReturnType>(data);
 				};
@@ -74,7 +75,7 @@ namespace rpc {
 
 		void stop();
 		void reconnect(bool due_to_failure = false);
-		promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args);
+		async::promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args);
 	};
 
 
@@ -87,7 +88,7 @@ namespace rpc {
 			server_invoker(client& _client): _client(_client) {
 			}
 
-			virtual promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args) {
+			virtual async::promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args) {
 				return _client.invoke(method_name, std::move(args));
 			}
 		};

@@ -8,7 +8,8 @@
 
 #include <tcb/span.hpp>
 
-#include "async.hpp"
+#include "common/async.hpp"
+
 #include "serialization.hpp"
 
 
@@ -71,7 +72,7 @@ namespace rpc {
 		struct method_impl {
 			const char* name;
 			std::string signature;
-			std::function<promise<std::vector<std::byte>>(void*, const std::vector<std::byte>&)> fn;
+			std::function<async::promise<std::vector<std::byte>>(void*, const std::vector<std::byte>&)> fn;
 		};
 	}
 
@@ -130,7 +131,7 @@ namespace rpc {
 	class generic_peer_invoker {
 	public:
 		virtual ~generic_peer_invoker() = default;
-		virtual promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args) = 0;
+		virtual async::promise<std::vector<std::byte>> invoke(const char* method_name, std::vector<std::byte>&& args) = 0;
 	};
 
 
@@ -140,7 +141,7 @@ namespace rpc {
 		peer_proxy_invoker(std::unique_ptr<generic_peer_invoker>&& invoker): invoker(std::move(invoker)) {
 		}
 
-		template<typename ReturnType, typename... Args> promise<ReturnType> invoke(const char* method_name, Args&&... args) {
+		template<typename ReturnType, typename... Args> async::promise<ReturnType> invoke(const char* method_name, Args&&... args) {
 			return invoker->invoke(method_name, serialize(std::tuple<Args...>{std::forward<Args>(args)...})) | [](const std::vector<std::byte>& data) {
 				return deserialize<ReturnType>(data);
 			};
@@ -161,7 +162,7 @@ namespace rpc {
 				template<typename Signature> struct announcement {
 					template<typename Getter> inline announcement(const char* method_name, Getter&& getter) {
 						auto method = getter(impl_container{});
-						_reflection.methods.push_back({method_name, stringify_type<std::remove_pointer_t<Signature>>(), [method](void* impl_ptr, const std::vector<std::byte>& args) -> promise<std::vector<std::byte>> {
+						_reflection.methods.push_back({method_name, stringify_type<std::remove_pointer_t<Signature>>(), [method](void* impl_ptr, const std::vector<std::byte>& args) -> async::promise<std::vector<std::byte>> {
 							SelfImpl& self_impl = *static_cast<SelfImpl*>(impl_ptr);
 							auto get_result = [&]() -> decltype(auto) {
 								return std::apply([&self_impl, method](auto&&... args) -> decltype(auto) {
@@ -170,9 +171,9 @@ namespace rpc {
 							};
 							if constexpr(std::is_same_v<decltype(get_result()), void>) {
 								get_result();
-								return to_promise(std::vector<std::byte>{});
+								return async::to_promise(std::vector<std::byte>{});
 							} else {
-								return to_promise(get_result()) | [](auto value) {
+								return async::to_promise(get_result()) | [](auto value) {
 									return serialize(std::forward<decltype(value)>(value));
 								};
 							}
@@ -193,6 +194,54 @@ namespace rpc {
 			return {SelfProtocol::name, {_reflection.methods.data(), _reflection.methods.size()}};
 		}
 	};
+
+
+	template<typename SelfImpl, typename SelfProtocol> class simplex_impl {
+		static inline struct reflection_t {
+			std::vector<reflection::method_impl> methods;
+			reflection_t() {
+				typename SelfProtocol::template group<strategy>{};
+			}
+			struct strategy {
+				struct impl_container {
+					using type = SelfImpl;
+				};
+				template<typename Signature> struct announcement {
+					template<typename Getter> inline announcement(const char* method_name, Getter&& getter) {
+						auto method = getter(impl_container{});
+						_reflection.methods.push_back({method_name, stringify_type<std::remove_pointer_t<Signature>>(), [method](void* impl_ptr, const std::vector<std::byte>& args) -> async::promise<std::vector<std::byte>> {
+							SelfImpl& self_impl = *static_cast<SelfImpl*>(impl_ptr);
+							auto get_result = [&]() -> decltype(auto) {
+								return std::apply([&self_impl, method](auto&&... args) -> decltype(auto) {
+									return (self_impl.*method)(std::forward<decltype(args)>(args)...);
+								}, deserialize<typename reflection::fn_traits<decltype(method)>::args_tuple>(args));
+							};
+							if constexpr(std::is_same_v<decltype(get_result()), void>) {
+								get_result();
+								return async::to_promise(std::vector<std::byte>{});
+							} else {
+								return async::to_promise(get_result()) | [](auto value) {
+									return serialize(std::forward<decltype(value)>(value));
+								};
+							}
+						}});
+					}
+				};
+			};
+		} _reflection;
+
+
+	public:
+		simplex_impl(std::unique_ptr<generic_peer_invoker>&& invoker) {
+		}
+
+		static generic_impl to_generic_impl() {
+			return {SelfProtocol::name, {_reflection.methods.data(), _reflection.methods.size()}};
+		}
+	};
+
+
+	RPC_PROTOCOL(EmptyProtocol,)
 }
 
 
